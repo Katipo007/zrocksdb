@@ -1,98 +1,102 @@
 pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
-    const linkage = b.option(std.builtin.LinkMode, "link-mode", "") orelse .static;
-    const has_altivec = b.option(bool, "has-altivec", "") orelse false;
-    const have_power8 = b.option(bool, "have-power8", "") orelse false;
-    const use_rtti = b.option(bool, "use-rtti", "") orelse (optimize == .Debug);
-    const assert_status_checked = b.option(bool, "assert-status-checked", "") orelse false;
-    const use_lto = b.option(bool, "use-lto", "") orelse (optimize != .Debug);
-    const no_threeway_crc32c = b.option(bool, "no-threeway=crc32c", "") orelse true;
-    const with_windows_utf8_filenames = b.option(bool, "with-windows-utf8-filenames", "") orelse false;
-    const have_fallocate = b.option(bool, "have-fallocate", "") orelse (target.result.os.tag == .linux);
-    const have_sync_file_range_write = b.option(bool, "have-sync-file-range-write", "") orelse false;
-    const have_pthread_mutex_adaptive_np = b.option(bool, "have-pthread-mutex-adaptive-np", "") orelse (target.result.os.tag == .linux);
-    const have_malloc_usable_size = b.option(bool, "have-malloc-usable-size", "") orelse false;
-    const have_sched_getcpu = b.option(bool, "have-sched-getcpu", "") orelse false;
-    const have_auxv_getauxval = b.option(bool, "have-auxv-getauxval", "") orelse false;
-    const have_fullfsync = b.option(bool, "have-fullfsync", "") orelse false;
+    const opt_linkage = b.option(std.builtin.LinkMode, "link-mode", "") orelse .static;
+    const opt_sanitize_c = b.option(std.zig.SanitizeC, "sanitize-c", "") orelse null;
+    const opt_sanitize_thread = b.option(bool, "sanitize-thread", "") orelse null;
+    const opt_has_altivec = b.option(bool, "has-altivec", "") orelse false;
+    const opt_have_power8 = b.option(bool, "have-power8", "") orelse false;
+    const opt_use_rtti = b.option(bool, "use-rtti", "") orelse (optimize == .Debug);
+    const opt_assert_status_checked = b.option(bool, "assert-status-checked", "") orelse false;
+    const opt_use_lto = b.option(bool, "use-lto", "") orelse (optimize != .Debug);
+    const opt_no_threeway_crc32c = b.option(bool, "no-threeway=crc32c", "") orelse true;
+    const opt_with_windows_utf8_filenames = b.option(bool, "with-windows-utf8-filenames", "") orelse false;
+    const opt_have_fallocate = b.option(bool, "have-fallocate", "") orelse (target.result.os.tag == .linux);
+    const opt_have_sync_file_range_write = b.option(bool, "have-sync-file-range-write", "") orelse false;
+    const opt_have_pthread_mutex_adaptive_np = b.option(bool, "have-pthread-mutex-adaptive-np", "") orelse (target.result.os.tag == .linux);
+    const opt_have_malloc_usable_size = b.option(bool, "have-malloc-usable-size", "") orelse false;
+    const opt_have_sched_getcpu = b.option(bool, "have-sched-getcpu", "") orelse false;
+    const opt_have_auxv_getauxval = b.option(bool, "have-auxv-getauxval", "") orelse false;
+    const opt_have_fullfsync = b.option(bool, "have-fullfsync", "") orelse false;
 
     const step_install = b.getInstallStep();
     const step_check = b.step("check", "Compile without emitting artifacts");
 
     const dep_rocksdb = b.dependency("rocksdb", .{});
 
-    var cpp_compile_flags = std.ArrayList([]const u8).empty;
-    try cpp_compile_flags.append(b.allocator, "-std=c++20");
-    try cpp_compile_flags.append(b.allocator, "-Wno-invalid-offsetof");
-    try cpp_compile_flags.append(b.allocator, if (use_rtti) "-DROCKSDB_USE_RTTI" else "-fno-rtti");
+    var librocksdb_compile_flags = std.ArrayList([]const u8).empty;
+    try librocksdb_compile_flags.append(b.allocator, "-std=c++20");
+    try librocksdb_compile_flags.append(b.allocator, "-Wno-invalid-offsetof");
+    try librocksdb_compile_flags.append(b.allocator, if (opt_use_rtti) "-DROCKSDB_USE_RTTI" else "-fno-rtti");
 
     if (optimize != .Debug)
-        try cpp_compile_flags.append(b.allocator, "-DNDEBUG");
-    if (has_altivec)
-        try cpp_compile_flags.append(b.allocator, "-DHAS_ALTIVEC");
-    if (have_power8)
-        try cpp_compile_flags.append(b.allocator, "-DHAVE_POWER8");
-    if (linkage == .dynamic)
-        try cpp_compile_flags.append(b.allocator, "-DROCKSDB_DLL");
-    if (assert_status_checked)
-        try cpp_compile_flags.appendSlice(b.allocator, &.{ "-fno-elide-constructors", "-DROCKSDB_ASSERT_STATUS_CHECKED" });
-    if (no_threeway_crc32c)
-        try cpp_compile_flags.append(b.allocator, "-DNO_THREEWAY_CRC32C");
-    if (with_windows_utf8_filenames)
-        try cpp_compile_flags.append(b.allocator, "-DROCKSDB_WINDOWS_UTF8_FILENAMES");
-    if (have_fallocate)
-        try cpp_compile_flags.append(b.allocator, "-DROCKSDB_FALLOCATE_PRESENT");
-    if (have_sync_file_range_write)
-        try cpp_compile_flags.append(b.allocator, "-DROCKSDB_RANGESYNC_PRESENT");
-    if (have_pthread_mutex_adaptive_np)
-        try cpp_compile_flags.append(b.allocator, "-DROCKSDB_PTHREAD_ADAPTIVE_MUTEX");
-    if (have_malloc_usable_size)
-        try cpp_compile_flags.append(b.allocator, "-DROCKSDB_MALLOC_USABLE_SIZE");
-    if (have_sched_getcpu)
-        try cpp_compile_flags.append(b.allocator, "-DROCKSDB_SCHED_GETCPU_PRESENT");
-    if (have_auxv_getauxval)
-        try cpp_compile_flags.append(b.allocator, "-DROCKSDB_AUXV_GETAUXVAL_PRESENT");
-    if (have_fullfsync)
-        try cpp_compile_flags.append(b.allocator, "-DHAVE_FULLFSYNC");
+        try librocksdb_compile_flags.append(b.allocator, "-DNDEBUG");
+    if (opt_has_altivec)
+        try librocksdb_compile_flags.append(b.allocator, "-DHAS_ALTIVEC");
+    if (opt_have_power8)
+        try librocksdb_compile_flags.append(b.allocator, "-DHAVE_POWER8");
+    if (opt_linkage == .dynamic)
+        try librocksdb_compile_flags.append(b.allocator, "-DROCKSDB_DLL");
+    if (opt_assert_status_checked)
+        try librocksdb_compile_flags.appendSlice(b.allocator, &.{ "-fno-elide-constructors", "-DROCKSDB_ASSERT_STATUS_CHECKED" });
+    if (opt_no_threeway_crc32c)
+        try librocksdb_compile_flags.append(b.allocator, "-DNO_THREEWAY_CRC32C");
+    if (opt_with_windows_utf8_filenames)
+        try librocksdb_compile_flags.append(b.allocator, "-DROCKSDB_WINDOWS_UTF8_FILENAMES");
+    if (opt_have_fallocate)
+        try librocksdb_compile_flags.append(b.allocator, "-DROCKSDB_FALLOCATE_PRESENT");
+    if (opt_have_sync_file_range_write)
+        try librocksdb_compile_flags.append(b.allocator, "-DROCKSDB_RANGESYNC_PRESENT");
+    if (opt_have_pthread_mutex_adaptive_np)
+        try librocksdb_compile_flags.append(b.allocator, "-DROCKSDB_PTHREAD_ADAPTIVE_MUTEX");
+    if (opt_have_malloc_usable_size)
+        try librocksdb_compile_flags.append(b.allocator, "-DROCKSDB_MALLOC_USABLE_SIZE");
+    if (opt_have_sched_getcpu)
+        try librocksdb_compile_flags.append(b.allocator, "-DROCKSDB_SCHED_GETCPU_PRESENT");
+    if (opt_have_auxv_getauxval)
+        try librocksdb_compile_flags.append(b.allocator, "-DROCKSDB_AUXV_GETAUXVAL_PRESENT");
+    if (opt_have_fullfsync)
+        try librocksdb_compile_flags.append(b.allocator, "-DHAVE_FULLFSYNC");
 
     // target specific
     {
-        if (target.result.abi == .gnu)
-            try cpp_compile_flags.append(b.allocator, "-fno-builtin-memcmp");
-        if (target.result.abi == .msvc)
-            try cpp_compile_flags.append(b.allocator, "/Od /RTC1 /Gm-");
-        const OsTag = std.Target.Os.Tag;
-        switch (target.result.os.tag) {
-            .ios => try cpp_compile_flags.appendSlice(b.allocator, &.{ "-DOS_MACOSX", "-DIOS_CROSS_COMPILE" }),
-            .linux => try cpp_compile_flags.append(b.allocator, "-DOS_LINUX"),
-            .solaris => try cpp_compile_flags.append(b.allocator, "-DOS_SOLARIS"),
-            .freebsd => try cpp_compile_flags.append(b.allocator, "-DOS_FREEBSD"),
-            .netbsd => try cpp_compile_flags.append(b.allocator, "-DOS_NETBSD"),
-            .openbsd => try cpp_compile_flags.append(b.allocator, "-DOS_OPENBSD"),
-            .dragonfly => try cpp_compile_flags.append(b.allocator, "-DOS_DRAGONFLYBSD"),
-            //.android => try cpp_compile_flags.append(b.allocator, "-DOS_ANDROID"),
-            .windows => try cpp_compile_flags.appendSlice(b.allocator, &.{ "-DWIN32", "-DOS_WIN", "-D_MBCS", "-DWIN64", "-DNOMINMAX" }),
+        switch (target.result.abi) {
+            .gnu => try librocksdb_compile_flags.append(b.allocator, "-fno-builtin-memcmp"),
+            .msvc => try librocksdb_compile_flags.append(b.allocator, "/Od /RTC1 /Gm-"),
             else => {},
         }
 
-        if (OsTag.isDarwin(target.result.os.tag))
-            try cpp_compile_flags.append(b.allocator, "-DOS_MACOSX");
-
+        switch (target.result.os.tag) {
+            .ios => try librocksdb_compile_flags.appendSlice(b.allocator, &.{ "-DOS_MACOSX", "-DIOS_CROSS_COMPILE" }),
+            .linux => try librocksdb_compile_flags.append(b.allocator, "-DOS_LINUX"),
+            .solaris => try librocksdb_compile_flags.append(b.allocator, "-DOS_SOLARIS"),
+            .freebsd => try librocksdb_compile_flags.append(b.allocator, "-DOS_FREEBSD"),
+            .netbsd => try librocksdb_compile_flags.append(b.allocator, "-DOS_NETBSD"),
+            .openbsd => try librocksdb_compile_flags.append(b.allocator, "-DOS_OPENBSD"),
+            .dragonfly => try librocksdb_compile_flags.append(b.allocator, "-DOS_DRAGONFLYBSD"),
+            //.android => try cpp_compile_flags.append(b.allocator, "-DOS_ANDROID"),
+            .windows => try librocksdb_compile_flags.appendSlice(b.allocator, &.{ "-DWIN32", "-DOS_WIN", "-D_MBCS", "-DWIN64", "-DNOMINMAX" }),
+            else => {},
+        }
+        if (target.result.os.tag.isDarwin())
+            try librocksdb_compile_flags.append(b.allocator, "-DOS_MACOSX");
         if (target.result.os.tag != .windows)
-            try cpp_compile_flags.appendSlice(b.allocator, &.{ "-DROCKSDB_PLATFORM_POSIX", "-DROCKSDB_LIB_IO_POSIX" });
+            try librocksdb_compile_flags.appendSlice(b.allocator, &.{ "-DROCKSDB_PLATFORM_POSIX", "-DROCKSDB_LIB_IO_POSIX" });
     }
 
     const mod_rocksdb = b.addModule("rocksdb", .{
+        .root_source_file = b.path("zrocksdb.zig"),
         .target = target,
         .optimize = optimize,
         .link_libcpp = true,
+        .sanitize_c = opt_sanitize_c,
+        .sanitize_thread = opt_sanitize_thread,
     });
     mod_rocksdb.addIncludePath(dep_rocksdb.path("include"));
     mod_rocksdb.addIncludePath(dep_rocksdb.path(""));
     mod_rocksdb.addCSourceFiles(.{
         .root = dep_rocksdb.path(""),
-        .flags = cpp_compile_flags.items,
+        .flags = librocksdb_compile_flags.items,
         .files = &.{
             "cache/cache.cc",
             "cache/cache_entry_roles.cc",
@@ -436,11 +440,11 @@ pub fn build(b: *std.Build) !void {
     const lib_rocksdb = b.addLibrary(.{
         .name = "rocksdb",
         .root_module = mod_rocksdb,
-        .linkage = linkage,
+        .linkage = opt_linkage,
         .use_llvm = true,
         .use_lld = true,
     });
-    lib_rocksdb.lto = if (use_lto) .full else .none;
+    lib_rocksdb.lto = if (opt_use_lto) .full else .none;
 
     step_check.dependOn(&lib_rocksdb.step);
     step_install.dependOn(&b.addInstallArtifact(lib_rocksdb, .{}).step);
