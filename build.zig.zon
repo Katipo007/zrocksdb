@@ -1,0 +1,16 @@
+.{
+    .name = .zrocksdb,
+    .version = "0.0.1",
+    .fingerprint = 0x1cc82bfda164f9a0,
+    .minimum_zig_version = "0.15.2",
+    .dependencies = .{
+        .rocksdb = .{
+            .url = "git+https://github.com/facebook/rocksdb#9e14d06143dae681d252cb0434bea667995eaede",
+            .hash = "N-V-__8AADD8kgLLuRl4NM-Q4-eO9EMuniaNmg0hDlh5EOsF",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+    },
+}
