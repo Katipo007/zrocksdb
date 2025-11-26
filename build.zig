@@ -18,28 +18,49 @@ pub fn build(b: *std.Build) !void {
     var cpp_compile_flags = std.ArrayList([]const u8).empty;
     try cpp_compile_flags.append(b.allocator, "-std=c++20");
     try cpp_compile_flags.append(b.allocator, "-Wno-invalid-offsetof");
+    try cpp_compile_flags.append(b.allocator, if (use_rtti) "-DROCKSDB_USE_RTTI" else "-fno-rtti");
 
     if (optimize != .Debug)
         try cpp_compile_flags.append(b.allocator, "-DNDEBUG");
-    if (use_rtti) {
-        try cpp_compile_flags.append(b.allocator, "-DROCKSDB_USE_RTTI");
-    } else {
-        try cpp_compile_flags.append(b.allocator, "-fno-rtti");
-    }
     if (has_altivec)
         try cpp_compile_flags.append(b.allocator, "-DHAS_ALTIVEC");
     if (have_power8)
         try cpp_compile_flags.append(b.allocator, "-DHAVE_POWER8");
     if (linkage == .dynamic)
         try cpp_compile_flags.append(b.allocator, "-DROCKSDB_DLL");
-    if (assert_status_checked) {
-        try cpp_compile_flags.append(b.allocator, "-fno-elide-constructors");
-        try cpp_compile_flags.append(b.allocator, "-DROCKSDB_ASSERT_STATUS_CHECKED");
-    }
+    if (assert_status_checked)
+        try cpp_compile_flags.appendSlice(b.allocator, &.{ "-fno-elide-constructors", "-DROCKSDB_ASSERT_STATUS_CHECKED" });
     if (no_threeway_crc32c)
         try cpp_compile_flags.append(b.allocator, "-DNO_THREEWAY_CRC32C");
     if (with_windows_utf8_filenames)
         try cpp_compile_flags.append(b.allocator, "-DROCKSDB_WINDOWS_UTF8_FILENAMES");
+
+    // target specific
+    {
+        if (target.result.abi == .gnu)
+            try cpp_compile_flags.append(b.allocator, "-fno-builtin-memcmp");
+        if (target.result.abi == .msvc)
+            try cpp_compile_flags.append(b.allocator, "/Od /RTC1 /Gm-");
+        const OsTag = std.Target.Os.Tag;
+        switch (target.result.os.tag) {
+            .ios => try cpp_compile_flags.appendSlice(b.allocator, &.{ "-DOS_MACOSX", "-DIOS_CROSS_COMPILE" }),
+            .linux => try cpp_compile_flags.append(b.allocator, "-DOS_LINUX"),
+            .solaris => try cpp_compile_flags.append(b.allocator, "-DOS_SOLARIS"),
+            .freebsd => try cpp_compile_flags.append(b.allocator, "-DOS_FREEBSD"),
+            .netbsd => try cpp_compile_flags.append(b.allocator, "-DOS_NETBSD"),
+            .openbsd => try cpp_compile_flags.append(b.allocator, "-DOS_OPENBSD"),
+            .dragonfly => try cpp_compile_flags.append(b.allocator, "-DOS_DRAGONFLYBSD"),
+            //.android => try cpp_compile_flags.append(b.allocator, "-DOS_ANDROID"),
+            .windows => try cpp_compile_flags.appendSlice(b.allocator, &.{ "-DWIN32", "-DOS_WIN", "-D_MBCS", "-DWIN64", "-DNOMINMAX" }),
+            else => {},
+        }
+
+        if (OsTag.isDarwin(target.result.os.tag))
+            try cpp_compile_flags.append(b.allocator, "-DOS_MACOSX");
+
+        if (target.result.os.tag != .windows)
+            try cpp_compile_flags.appendSlice(b.allocator, &.{ "-DROCKSDB_PLATFORM_POSIX", "-DROCKSDB_LIB_IO_POSIX" });
+    }
 
     const mod_rocksdb = b.addModule("rocksdb", .{
         .target = target,
