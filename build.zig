@@ -4,7 +4,7 @@ pub fn build(b: *std.Build) !void {
     const linkage = b.option(std.builtin.LinkMode, "link-mode", "") orelse .static;
     const has_altivec = b.option(bool, "has-altivec", "") orelse false;
     const have_power8 = b.option(bool, "have-power8", "") orelse false;
-    const use_rtti = b.option(bool, "use-rtti", "") orelse false;
+    const use_rtti = b.option(bool, "use-rtti", "") orelse (optimize == .Debug);
     const assert_status_checked = b.option(bool, "assert-status-checked", "") orelse false;
     const use_lto = b.option(bool, "use-lto", "") orelse (optimize != .Debug);
     const no_threeway_crc32c = b.option(bool, "no-threeway=crc32c", "") orelse true;
@@ -15,7 +15,7 @@ pub fn build(b: *std.Build) !void {
     const have_malloc_usable_size = b.option(bool, "have-malloc-usable-size", "") orelse false;
     const have_sched_getcpu = b.option(bool, "have-sched-getcpu", "") orelse false;
     const have_auxv_getauxval = b.option(bool, "have-auxv-getauxval", "") orelse false;
-    const have_fullfsync = b.option(bool, "have-fullfsync", "") orelse (target.result.os.tag == .linux);
+    const have_fullfsync = b.option(bool, "have-fullfsync", "") orelse false;
 
     const step_install = b.getInstallStep();
     const step_check = b.step("check", "Compile without emitting artifacts");
