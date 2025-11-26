@@ -9,6 +9,13 @@ pub fn build(b: *std.Build) !void {
     const use_lto = b.option(bool, "use-lto", "") orelse (optimize != .Debug);
     const no_threeway_crc32c = b.option(bool, "no-threeway=crc32c", "") orelse true;
     const with_windows_utf8_filenames = b.option(bool, "with-windows-utf8-filenames", "") orelse false;
+    const have_fallocate = b.option(bool, "have-fallocate", "") orelse (target.result.os.tag == .linux);
+    const have_sync_file_range_write = b.option(bool, "have-sync-file-range-write", "") orelse false;
+    const have_pthread_mutex_adaptive_np = b.option(bool, "have-pthread-mutex-adaptive-np", "") orelse (target.result.os.tag == .linux);
+    const have_malloc_usable_size = b.option(bool, "have-malloc-usable-size", "") orelse false;
+    const have_sched_getcpu = b.option(bool, "have-sched-getcpu", "") orelse false;
+    const have_auxv_getauxval = b.option(bool, "have-auxv-getauxval", "") orelse false;
+    const have_fullfsync = b.option(bool, "have-fullfsync", "") orelse (target.result.os.tag == .linux);
 
     const step_install = b.getInstallStep();
     const step_check = b.step("check", "Compile without emitting artifacts");
@@ -34,6 +41,20 @@ pub fn build(b: *std.Build) !void {
         try cpp_compile_flags.append(b.allocator, "-DNO_THREEWAY_CRC32C");
     if (with_windows_utf8_filenames)
         try cpp_compile_flags.append(b.allocator, "-DROCKSDB_WINDOWS_UTF8_FILENAMES");
+    if (have_fallocate)
+        try cpp_compile_flags.append(b.allocator, "-DROCKSDB_FALLOCATE_PRESENT");
+    if (have_sync_file_range_write)
+        try cpp_compile_flags.append(b.allocator, "-DROCKSDB_RANGESYNC_PRESENT");
+    if (have_pthread_mutex_adaptive_np)
+        try cpp_compile_flags.append(b.allocator, "-DROCKSDB_PTHREAD_ADAPTIVE_MUTEX");
+    if (have_malloc_usable_size)
+        try cpp_compile_flags.append(b.allocator, "-DROCKSDB_MALLOC_USABLE_SIZE");
+    if (have_sched_getcpu)
+        try cpp_compile_flags.append(b.allocator, "-DROCKSDB_SCHED_GETCPU_PRESENT");
+    if (have_auxv_getauxval)
+        try cpp_compile_flags.append(b.allocator, "-DROCKSDB_AUXV_GETAUXVAL_PRESENT");
+    if (have_fullfsync)
+        try cpp_compile_flags.append(b.allocator, "-DHAVE_FULLFSYNC");
 
     // target specific
     {
