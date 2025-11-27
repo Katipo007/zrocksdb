@@ -89,20 +89,20 @@ pub fn build(b: *std.Build) !void {
     {
         const build_date = "";
         const git_sha = "9e14d06143dae681d252cb0434bea667995eaede"; //$(shell git rev-parse HEAD 2>/dev/null)
-        const git_tag = "main"; //$(shell git symbolic-ref -q --short HEAD 2> /dev/null || git describe --tags --exact-match 2>/dev/null)
-        const git_mod = 1; //$(shell git diff-index HEAD --quiet 2>/dev/null; echo $$?)
-        const git_date = ""; //$(shell git log -1 --date=format:"%Y-%m-%d %T" --format="%ad" 2>/dev/null)
+        const git_tag = ""; //$(shell git symbolic-ref -q --short HEAD 2> /dev/null || git describe --tags --exact-match 2>/dev/null)
+        const git_mod = 0; //$(shell git diff-index HEAD --quiet 2>/dev/null; echo $$?)
+        const git_date = "2025-11-24 10:48:09"; //$(shell git log -1 --date=format:"%Y-%m-%d %T" --format="%ad" 2>/dev/null)
         const plugin_builtins = "";
         const plugin_externals = "";
 
         gen_build_version.addArgs(&.{ "-e", b.fmt("s/@GIT_SHA@/{s}/", .{git_sha}) });
-        gen_build_version.addArgs(&.{ "-e", b.fmt("s:@GIT_TAG@:\"{s}\":", .{git_tag}) });
-        gen_build_version.addArgs(&.{ "-e", b.fmt("s/@GIT_MOD@/\"{d}\"/", .{git_mod}) });
-        gen_build_version.addArgs(&.{ "-e", b.fmt("s/@BUILD_DATE@/\"{s}\"/", .{build_date}) });
-        gen_build_version.addArgs(&.{ "-e", b.fmt("s/@GIT_DATE@/\"{s}\"/", .{git_date}) });
-        gen_build_version.addArgs(&.{ "-e", b.fmt("s/@ROCKSDB_PLUGIN_BUILTINS@/'{s}'/", .{plugin_builtins}) });
-        gen_build_version.addArgs(&.{ "-e", b.fmt("s/@ROCKSDB_PLUGIN_EXTERNS@/\"{s}\"/", .{plugin_externals}) });
-        gen_build_version.addFileInput(dep_rocksdb.path("util/build_version.cc.in"));
+        gen_build_version.addArgs(&.{ "-e", b.fmt("s:@GIT_TAG@:{s}:", .{git_tag}) });
+        gen_build_version.addArgs(&.{ "-e", b.fmt("s/@GIT_MOD@/{d}/", .{git_mod}) });
+        gen_build_version.addArgs(&.{ "-e", b.fmt("s/@BUILD_DATE@/{s}/", .{build_date}) });
+        gen_build_version.addArgs(&.{ "-e", b.fmt("s/@GIT_DATE@/{s}/", .{git_date}) });
+        gen_build_version.addArgs(&.{ "-e", b.fmt("s/@ROCKSDB_PLUGIN_BUILTINS@/{s}/", .{plugin_builtins}) });
+        gen_build_version.addArgs(&.{ "-e", b.fmt("s/@ROCKSDB_PLUGIN_EXTERNS@/{s}/", .{plugin_externals}) });
+        gen_build_version.addFileArg(dep_rocksdb.path("util/build_version.cc.in"));
     }
     const build_version_cc = gen_build_version.captureStdOut();
 
