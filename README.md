@@ -10,6 +10,7 @@ Currently provides:
 - A Zig module `zrocksdb` and access to the C API through it.
 - The `rocksdb` static/shared library.
 - Access to the RocksDB `include/` directory via the named lazypath `include`.
+- Support for [snappy](https://github.com/google/snappy) compression library.
 
 ## Dependencies
 
@@ -18,10 +19,19 @@ Currently provides:
 - [Zig](https://ziglang.org/) 0.15.2
 
 ## Compatibility
+
 Thus far only tested the following platforms:
 - x86_64-linux-gnu
 
 ## TODO
-- Zig wrapper for the C API.
-- Build and run the RocksDB tests.
-- Integrate the compression libraries that RocksDB supports.
+
+- [x] Build `rocksdb` library.
+- [x] `zrocksdb` module providing access to the C API.
+- [ ] `zrocksdb` module providing a Zig API.
+- [ ] Build and run the RocksDB tests.
+- Integrate the compression libraries that RocksDB supports:
+  - [ ] zlib
+  - [ ] bzip2
+  - [ ] lz4
+  - [x] snappy
+  - [ ] zstandard

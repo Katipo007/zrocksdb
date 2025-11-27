@@ -13,7 +13,7 @@ test "Basic Usage" {
     defer c.rocksdb_options_destroy(opts);
     c.rocksdb_options_set_create_if_missing(opts, 1);
     c.rocksdb_options_set_error_if_exists(opts, 1);
-    c.rocksdb_options_set_compression(opts, c.rocksdb_no_compression);
+    c.rocksdb_options_set_compression(opts, c.rocksdb_snappy_compression);
 
     var err: ?[*:0]const u8 = null;
     const db = c.rocksdb_open(opts, @ptrCast(db_name), @ptrCast(&err));

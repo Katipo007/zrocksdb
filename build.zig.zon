@@ -8,6 +8,11 @@
             .url = "git+https://github.com/facebook/rocksdb#9e14d06143dae681d252cb0434bea667995eaede",
             .hash = "N-V-__8AADD8kgLLuRl4NM-Q4-eO9EMuniaNmg0hDlh5EOsF",
         },
+        .snappy = .{
+            .url = "https://github.com/google/snappy/archive/refs/tags/1.2.2.tar.gz",
+            .hash = "N-V-__8AAKIfMwDk1au912zZAJLGmqHl769-gDkJe6on4cq8",
+            .lazy = true,
+        },
     },
     .paths = .{
         "build.zig",

@@ -18,6 +18,7 @@ pub fn build(b: *std.Build) !void {
     const opt_have_sched_getcpu = b.option(bool, "have-sched-getcpu", "") orelse false;
     const opt_have_auxv_getauxval = b.option(bool, "have-auxv-getauxval", "") orelse false;
     const opt_have_fullfsync = b.option(bool, "have-fullfsync", "") orelse false;
+    const opt_snappy = b.option(bool, "link-snappy", "") orelse true;
 
     const step_install = b.getInstallStep();
     const step_check = b.step("check", "Compile without emitting artifacts");
@@ -58,6 +59,8 @@ pub fn build(b: *std.Build) !void {
         try librocksdb_compile_flags.append(b.allocator, "-DROCKSDB_AUXV_GETAUXVAL_PRESENT");
     if (opt_have_fullfsync)
         try librocksdb_compile_flags.append(b.allocator, "-DHAVE_FULLFSYNC");
+    if (opt_snappy)
+        try librocksdb_compile_flags.append(b.allocator, "-DSNAPPY");
 
     // target specific
     {
@@ -464,6 +467,51 @@ pub fn build(b: *std.Build) !void {
         .flags = librocksdb_compile_flags.items,
         .file = build_version_cc,
     });
+
+    if (opt_snappy) {
+        if (b.lazyDependency("snappy", .{})) |dep_snappy| {
+            const mod_snappy = b.createModule(.{
+                .target = target,
+                .optimize = optimize,
+                .link_libcpp = true,
+                .sanitize_c = opt_sanitize_c,
+                .sanitize_thread = opt_sanitize_thread,
+                .strip = optimize != .Debug,
+            });
+            mod_snappy.addCSourceFiles(.{
+                .root = dep_snappy.path(""),
+                .files = &[_][]const u8{
+                    "snappy-sinksource.cc",
+                    "snappy-stubs-internal.cc",
+                    "snappy.cc",
+                    "snappy-c.cc",
+                },
+                .flags = &[_][]const u8{
+                    "-std=c++11",
+                    "-Wno-sign-compare",
+                },
+            });
+
+            const snappy_stubs_public_h = b.addConfigHeader(.{
+                .style = .{ .cmake = dep_snappy.path("snappy-stubs-public.h.in") },
+            }, .{
+                .HAVE_SYS_UIO_H_01 = target.result.os.tag != .windows,
+                .PROJECT_VERSION_MAJOR = @as(i64, 1),
+                .PROJECT_VERSION_MINOR = @as(i64, 2),
+                .PROJECT_VERSION_PATCH = @as(i64, 2),
+            });
+
+            const lib_snappy = b.addLibrary(.{
+                .name = "snappy",
+                .root_module = mod_snappy,
+                .linkage = .static,
+            });
+            lib_snappy.lto = if (opt_use_lto) .full else .none;
+            mod_rocksdb.addIncludePath(dep_snappy.path(""));
+            mod_rocksdb.addIncludePath(snappy_stubs_public_h.getOutputDir());
+            mod_rocksdb.linkLibrary(lib_snappy);
+        }
+    }
 
     const lib_rocksdb = b.addLibrary(.{
         .name = "rocksdb",
