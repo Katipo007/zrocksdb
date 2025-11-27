@@ -84,17 +84,39 @@ pub fn build(b: *std.Build) !void {
             try librocksdb_compile_flags.appendSlice(b.allocator, &.{ "-DROCKSDB_PLATFORM_POSIX", "-DROCKSDB_LIB_IO_POSIX" });
     }
 
+    const gen_build_version = b.addSystemCommand(&.{"sed"});
+    {
+        const build_date = "";
+        const git_sha = "9e14d06143dae681d252cb0434bea667995eaede"; //$(shell git rev-parse HEAD 2>/dev/null)
+        const git_tag = "main"; //$(shell git symbolic-ref -q --short HEAD 2> /dev/null || git describe --tags --exact-match 2>/dev/null)
+        const git_mod = 1; //$(shell git diff-index HEAD --quiet 2>/dev/null; echo $$?)
+        const git_date = ""; //$(shell git log -1 --date=format:"%Y-%m-%d %T" --format="%ad" 2>/dev/null)
+        const plugin_builtins = "";
+        const plugin_externals = "";
+
+        gen_build_version.addArgs(&.{ "-e", b.fmt("s/@GIT_SHA@/{s}/", .{git_sha}) });
+        gen_build_version.addArgs(&.{ "-e", b.fmt("s:@GIT_TAG@:\"{s}\":", .{git_tag}) });
+        gen_build_version.addArgs(&.{ "-e", b.fmt("s/@GIT_MOD@/\"{d}\"/", .{git_mod}) });
+        gen_build_version.addArgs(&.{ "-e", b.fmt("s/@BUILD_DATE@/\"{s}\"/", .{build_date}) });
+        gen_build_version.addArgs(&.{ "-e", b.fmt("s/@GIT_DATE@/\"{s}\"/", .{git_date}) });
+        gen_build_version.addArgs(&.{ "-e", b.fmt("s/@ROCKSDB_PLUGIN_BUILTINS@/'{s}'/", .{plugin_builtins}) });
+        gen_build_version.addArgs(&.{ "-e", b.fmt("s/@ROCKSDB_PLUGIN_EXTERNS@/\"{s}\"/", .{plugin_externals}) });
+        gen_build_version.addFileInput(dep_rocksdb.path("util/build_version.cc.in"));
+    }
+    const build_version_cc = gen_build_version.captureStdOut();
+
     const mod_rocksdb = b.addModule("rocksdb", .{
-        .root_source_file = b.path("zrocksdb.zig"),
         .target = target,
         .optimize = optimize,
         .link_libcpp = true,
         .sanitize_c = opt_sanitize_c,
         .sanitize_thread = opt_sanitize_thread,
+        .strip = optimize != .Debug,
     });
     mod_rocksdb.addIncludePath(dep_rocksdb.path("include"));
     mod_rocksdb.addIncludePath(dep_rocksdb.path(""));
     mod_rocksdb.addCSourceFiles(.{
+        .language = .cpp,
         .root = dep_rocksdb.path(""),
         .flags = librocksdb_compile_flags.items,
         .files = &.{
@@ -436,15 +458,28 @@ pub fn build(b: *std.Build) !void {
             "utilities/write_batch_with_index/write_batch_with_index_internal.cc",
         },
     });
+    mod_rocksdb.addCSourceFile(.{
+        .language = .cpp,
+        .flags = librocksdb_compile_flags.items,
+        .file = build_version_cc,
+    });
 
     const lib_rocksdb = b.addLibrary(.{
         .name = "rocksdb",
         .root_module = mod_rocksdb,
         .linkage = opt_linkage,
-        .use_llvm = true,
-        .use_lld = true,
     });
     lib_rocksdb.lto = if (opt_use_lto) .full else .none;
+
+    b.addNamedLazyPath("include", dep_rocksdb.path("include"));
+
+    const mod_zrocksdb = b.addModule("zrocksdb", .{
+        .root_source_file = b.path("zrocksdb.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    mod_zrocksdb.addIncludePath(dep_rocksdb.path("include"));
+    mod_zrocksdb.linkLibrary(lib_rocksdb);
 
     step_check.dependOn(&lib_rocksdb.step);
     step_install.dependOn(&b.addInstallArtifact(lib_rocksdb, .{}).step);
