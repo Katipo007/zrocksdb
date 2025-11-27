@@ -496,7 +496,7 @@ pub fn build(b: *std.Build) !void {
             .step_check = step_check,
             .step_test = step_test,
         };
-        try add_test(b, b.path("tests/basic-usage.zig"), ctx);
+        try add_test(b, "basic-usage", b.path("tests/basic-usage.zig"), ctx);
     }
 }
 
@@ -509,8 +509,9 @@ const TestContext = struct {
     cwd: std.Build.LazyPath,
 };
 
-fn add_test(b: *std.Build, source: std.Build.LazyPath, ctx: TestContext) !void {
+fn add_test(b: *std.Build, name: []const u8, source: std.Build.LazyPath, ctx: TestContext) !void {
     const exe_test = b.addTest(.{
+        .name = name,
         .root_module = b.createModule(.{
             .root_source_file = source,
             .target = ctx.target,

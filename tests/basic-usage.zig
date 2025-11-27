@@ -3,6 +3,11 @@ const c = @import("zrocksdb").c;
 const c_allocator = std.heap.c_allocator;
 
 test "Basic Usage" {
+    var temp_dir = std.testing.tmpDir(.{});
+    defer temp_dir.cleanup();
+
+    try temp_dir.dir.setAsCwd();
+
     const db_name = "testdb";
     const opts = c.rocksdb_options_create();
     defer c.rocksdb_options_destroy(opts);
@@ -11,7 +16,7 @@ test "Basic Usage" {
     c.rocksdb_options_set_compression(opts, c.rocksdb_no_compression);
 
     var err: ?[*:0]const u8 = null;
-    const db = c.rocksdb_open(opts, db_name, @ptrCast(&err));
+    const db = c.rocksdb_open(opts, @ptrCast(db_name), @ptrCast(&err));
     defer c.rocksdb_close(db);
     if (err) |error_message| {
         defer {
