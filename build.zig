@@ -21,6 +21,7 @@ pub fn build(b: *std.Build) !void {
 
     const step_install = b.getInstallStep();
     const step_check = b.step("check", "Compile without emitting artifacts");
+    const step_test = b.step("test", "Run the tests");
 
     const dep_rocksdb = b.dependency("rocksdb", .{});
 
@@ -484,7 +485,47 @@ pub fn build(b: *std.Build) !void {
     step_check.dependOn(&lib_rocksdb.step);
     step_install.dependOn(&b.addInstallArtifact(lib_rocksdb, .{}).step);
 
-    b.addNamedLazyPath("include", dep_rocksdb.path("include"));
+    // Tests
+    {
+        const test_write_files = b.addWriteFiles();
+        const ctx: TestContext = .{
+            .target = target,
+            .optimize = optimize,
+            .mod_zrocksdb = mod_zrocksdb,
+            .cwd = test_write_files.getDirectory(),
+            .step_check = step_check,
+            .step_test = step_test,
+        };
+        try add_test(b, b.path("tests/basic-usage.zig"), ctx);
+    }
+}
+
+const TestContext = struct {
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    mod_zrocksdb: *std.Build.Module,
+    step_check: *std.Build.Step,
+    step_test: *std.Build.Step,
+    cwd: std.Build.LazyPath,
+};
+
+fn add_test(b: *std.Build, source: std.Build.LazyPath, ctx: TestContext) !void {
+    const exe_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = source,
+            .target = ctx.target,
+            .optimize = ctx.optimize,
+            .imports = &.{
+                .{ .name = "zrocksdb", .module = ctx.mod_zrocksdb },
+            },
+            .link_libc = true,
+        }),
+    });
+    ctx.step_check.dependOn(&exe_test.step);
+
+    const run_test = b.addRunArtifact(exe_test);
+    run_test.setCwd(ctx.cwd);
+    ctx.step_test.dependOn(&run_test.step);
 }
 
 const std = @import("std");
